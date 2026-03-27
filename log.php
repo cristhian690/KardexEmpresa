@@ -235,7 +235,7 @@ td.td-fecha{white-space:nowrap;}
 
   <!-- FILTROS -->
   <div class="filter-panel">
-    <div class="filter-title">🔍 Filtrar actividad</div>
+    <div class="filter-title"> Filtrar actividad</div>
     <form method="GET">
       <div class="filter-row">
         <div class="fg">

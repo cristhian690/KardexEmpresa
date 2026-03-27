@@ -209,19 +209,27 @@ if ($export === 'excel') {
     }
 
     // Fila totales
+    // Saldos: mostrar ÚLTIMO valor (no sumar) — el saldo es acumulativo
+    $ultimo = end($registros);
     $tr  = count($registros) + 3;
     $xml .= '<row r="'.$tr.'" ht="18" customHeight="1">';
     $xml .= '<c r="A'.$tr.'" t="s" s="3"><v>'.$si('TOTALES').'</v></c>';
     foreach (['B','C','D','E','F','G','H'] as $tl) {
         $xml .= '<c r="'.$tl.$tr.'" t="s" s="3"><v>'.$si('').'</v></c>';
     }
-    $totMap = [
-        'I'=>'e_cantidad',    'J'=>'', 'K'=>'e_total',
-        'L'=>'s_cantidad',    'M'=>'', 'N'=>'s_total',
-        'O'=>'saldo_cantidad','P'=>'', 'Q'=>'saldo_total',
+    // I=E.Cant  J=E.CU  K=E.Total  L=S.Cant  M=S.CU  N=S.Total  O=Saldo.Cant  P=Saldo.CU  Q=Saldo.Total
+    $totales = [
+        'I' => (float)array_sum(array_column($registros, 'e_cantidad')),   // SUMAR entradas
+        'J' => 0.0,
+        'K' => (float)array_sum(array_column($registros, 'e_total')),      // SUMAR entradas total
+        'L' => (float)array_sum(array_column($registros, 's_cantidad')),   // SUMAR salidas
+        'M' => 0.0,
+        'N' => (float)array_sum(array_column($registros, 's_total')),      // SUMAR salidas total
+        'O' => (float)($ultimo['saldo_cantidad'] ?? 0),                    // ÚLTIMO saldo cantidad
+        'P' => (float)($ultimo['saldo_costo_u']  ?? 0),                    // ÚLTIMO saldo costo unit
+        'Q' => (float)($ultimo['saldo_total']    ?? 0),                    // ÚLTIMO saldo total
     ];
-    foreach ($totMap as $tl => $field) {
-        $val = $field ? (float)array_sum(array_column($registros, $field)) : 0.0;
+    foreach ($totales as $tl => $val) {
         $xml .= '<c r="'.$tl.$tr.'" s="3"><v>'.$val.'</v></c>';
     }
     $xml .= '</row>';
@@ -564,6 +572,7 @@ tfoot td{padding:10px;font-weight:700;font-size:11.5px;font-family:var(--font-mo
         <?php endif; ?>
         </tbody>
         <?php if (!empty($registros)): ?>
+        <?php $ultimo_reg = end($registros); ?>
         <tfoot>
           <tr>
             <td colspan="8" class="tf-label" style="text-align:right;padding-right:16px">TOTALES →</td>
@@ -573,7 +582,9 @@ tfoot td{padding:10px;font-weight:700;font-size:11.5px;font-family:var(--font-mo
             <td class="td-s" style="font-weight:700"><?= number_format($total_s_cant,3) ?></td>
             <td></td>
             <td class="td-s" style="font-weight:700"><?= number_format($total_s_tot,3) ?></td>
-            <td colspan="3"></td>
+            <td class="td-b" style="font-weight:700"><?= number_format($ultimo_reg['saldo_cantidad'],3) ?></td>
+            <td class="td-b" style="font-weight:700"><?= number_format($ultimo_reg['saldo_costo_u'],4) ?></td>
+            <td class="td-b" style="font-weight:700"><?= number_format($ultimo_reg['saldo_total'],3) ?></td>
           </tr>
         </tfoot>
         <?php endif; ?>

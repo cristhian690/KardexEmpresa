@@ -722,7 +722,7 @@ $stats = $statsQ->fetch(PDO::FETCH_ASSOC);
 
   <!-- FILTROS -->
   <div class="filter-panel">
-    <div class="filter-title">🔍 Filtrar registros</div>
+    <div class="filter-title"> Filtrar registros</div>
     <form method="GET" action="">
       <div class="filter-row">
         <div class="filter-group">

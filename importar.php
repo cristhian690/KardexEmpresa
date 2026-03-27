@@ -92,6 +92,28 @@ function procesarCSV(string $tmp, int $saltar, PDO $pdo): array {
 
     $sep = detectarSeparador($primeraLinea);
 
+    // Detectar formato leyendo primera fila de datos
+    // Formato A (16 cols): codigo, descripcion, fecha, ...
+    // Formato B (15 cols): codigo, fecha, ... (sin descripcion)
+    $formato = 'A';
+    $handleDet = fopen($tmp, 'r');
+    $bomDet = fread($handleDet, 3);
+    if ($bomDet !== "ï»¿") rewind($handleDet);
+    $idxDet = 0;
+    while (($rowDet = fgetcsv($handleDet, 0, $sep)) !== false) {
+        $idxDet++;
+        if ($idxDet <= $saltar) continue;
+        if (empty(array_filter(array_map('trim', $rowDet)))) continue;
+        $numCols = count($rowDet);
+        $col1    = trim($rowDet[1] ?? '');
+        // Si col[1] parece fecha DD/MM/YYYY → sin descripcion (Formato B)
+        if ($numCols <= 15 || preg_match('/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}$/', $col1)) {
+            $formato = 'B';
+        }
+        break;
+    }
+    fclose($handleDet);
+
     $sql = "INSERT INTO kardex
             (codigo, descripcion, fecha, comprobante_tipo, comprobante_serie,
              comprobante_numero, tipo_operacion,
@@ -123,24 +145,48 @@ function procesarCSV(string $tmp, int $saltar, PDO $pdo): array {
         }
 
         try {
-            $stmt->execute([
-                ':codigo'             => limpiarTexto($col[0]  ?? '', 50),
-                ':descripcion'        => limpiarTexto($col[1]  ?? '', 255),
-                ':fecha'              => parsearFecha($col[2]  ?? null),
-                ':comprobante_tipo'   => limpiarTexto($col[3]  ?? '', 20),
-                ':comprobante_serie'  => limpiarTexto($col[4]  ?? '', 20),
-                ':comprobante_numero' => limpiarTexto($col[5]  ?? '', 50),
-                ':tipo_operacion'     => limpiarTexto($col[6]  ?? '', 100),
-                ':e_cantidad'         => limpiarDecimal($col[7]  ?? 0),
-                ':e_costo_u'          => limpiarDecimal($col[8]  ?? 0),
-                ':e_total'            => limpiarDecimal($col[9]  ?? 0),
-                ':s_cantidad'         => limpiarDecimal($col[10] ?? 0),
-                ':s_costo_u'          => limpiarDecimal($col[11] ?? 0),
-                ':s_total'            => limpiarDecimal($col[12] ?? 0),
-                ':saldo_cantidad'     => limpiarDecimal($col[13] ?? 0),
-                ':saldo_costo_u'      => limpiarDecimal($col[14] ?? 0),
-                ':saldo_total'        => limpiarDecimal($col[15] ?? 0),
-            ]);
+            if ($formato === 'A') {
+                // 16 cols: codigo, descripcion, fecha, c_tipo, c_serie, c_num, tipo_op, 9 nums
+                $params = [
+                    ':codigo'             => limpiarTexto($col[0]  ?? '', 50),
+                    ':descripcion'        => limpiarTexto($col[1]  ?? '', 255),
+                    ':fecha'              => parsearFecha($col[2]  ?? null),
+                    ':comprobante_tipo'   => limpiarTexto($col[3]  ?? '', 20),
+                    ':comprobante_serie'  => limpiarTexto($col[4]  ?? '', 20),
+                    ':comprobante_numero' => limpiarTexto($col[5]  ?? '', 50),
+                    ':tipo_operacion'     => limpiarTexto($col[6]  ?? '', 100),
+                    ':e_cantidad'         => limpiarDecimal($col[7]  ?? 0),
+                    ':e_costo_u'          => limpiarDecimal($col[8]  ?? 0),
+                    ':e_total'            => limpiarDecimal($col[9]  ?? 0),
+                    ':s_cantidad'         => limpiarDecimal($col[10] ?? 0),
+                    ':s_costo_u'          => limpiarDecimal($col[11] ?? 0),
+                    ':s_total'            => limpiarDecimal($col[12] ?? 0),
+                    ':saldo_cantidad'     => limpiarDecimal($col[13] ?? 0),
+                    ':saldo_costo_u'      => limpiarDecimal($col[14] ?? 0),
+                    ':saldo_total'        => limpiarDecimal($col[15] ?? 0),
+                ];
+            } else {
+                // 15 cols: codigo, fecha, c_tipo, c_serie, c_num, tipo_op, 9 nums (sin descripcion)
+                $params = [
+                    ':codigo'             => limpiarTexto($col[0]  ?? '', 50),
+                    ':descripcion'        => '',
+                    ':fecha'              => parsearFecha($col[1]  ?? null),
+                    ':comprobante_tipo'   => limpiarTexto($col[2]  ?? '', 20),
+                    ':comprobante_serie'  => limpiarTexto($col[3]  ?? '', 20),
+                    ':comprobante_numero' => limpiarTexto($col[4]  ?? '', 50),
+                    ':tipo_operacion'     => limpiarTexto($col[5]  ?? '', 100),
+                    ':e_cantidad'         => limpiarDecimal($col[6]  ?? 0),
+                    ':e_costo_u'          => limpiarDecimal($col[7]  ?? 0),
+                    ':e_total'            => limpiarDecimal($col[8]  ?? 0),
+                    ':s_cantidad'         => limpiarDecimal($col[9]  ?? 0),
+                    ':s_costo_u'          => limpiarDecimal($col[10] ?? 0),
+                    ':s_total'            => limpiarDecimal($col[11] ?? 0),
+                    ':saldo_cantidad'     => limpiarDecimal($col[12] ?? 0),
+                    ':saldo_costo_u'      => limpiarDecimal($col[13] ?? 0),
+                    ':saldo_total'        => limpiarDecimal($col[14] ?? 0),
+                ];
+            }
+            $stmt->execute($params);
             $insertados++;
         } catch (PDOException $e) {
             $errores++;
@@ -153,7 +199,7 @@ function procesarCSV(string $tmp, int $saltar, PDO $pdo): array {
 
     $pdo->exec("SET FOREIGN_KEY_CHECKS=1; SET UNIQUE_CHECKS=1; SET autocommit=1;");
 
-    return ['insertados' => $insertados, 'errores' => $errores, 'errores_det' => $errores_det];
+    return ['insertados' => $insertados, 'errores' => $errores, 'errores_det' => $errores_det, 'formato' => $formato];
 }
 
 // ============================================================
@@ -211,6 +257,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['archivos'])) {
                 'insertados'  => $r['insertados'],
                 'errores'     => $r['errores'],
                 'errores_det' => $r['errores_det'],
+                'formato'     => $r['formato'] ?? 'A',
             ];
         }
     }
@@ -395,6 +442,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
                   <div class="result-stat" style="color:var(--warning)"><strong><?= $r['errores'] ?></strong> filas con error</div>
                 <?php endif; ?>
                 <div class="result-stat"><?= $r['size'] ?> KB</div>
+                <div class="result-stat" style="color:var(--text3)">Formato <?= ($r['formato']??'A') === 'B' ? 'sin descripción' : 'con descripción' ?></div>
               </div>
               <?php foreach ($r['errores_det'] as $ed): ?>
                 <div class="err-det">⚠ <?= htmlspecialchars($ed) ?></div>
